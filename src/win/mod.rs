@@ -6,16 +6,24 @@ use std::ptr::null_mut;
 use winapi::shared::windef::HWND__;
 use winapi::um::winuser::{FindWindowW, SetForegroundWindow, ShowWindow, SW_RESTORE};
 
-pub struct Win {
-    handle: *mut HWND__,
-    pub mouse: Enigo,
-}
-
 pub struct CheckRGB {
     pub x: u32,
     pub y: u32,
     pub rgb: [u8; 3],
     pub desc: &'static str,
+}
+
+pub struct Padding {
+    pub top: u32,
+    pub bottom: u32,
+    pub left: u32,
+    pub right: u32,
+}
+
+pub struct Win {
+    handle: *mut HWND__,
+    pub mouse: Enigo,
+    padding: Padding,
 }
 
 impl Win {
@@ -48,19 +56,30 @@ impl Win {
         }
     }
 
-    pub fn new(title: &str) -> Option<Self> {
+    pub fn new(title: &str, padding: Padding) -> Option<Self> {
         let handle = Self::open_window(title);
         match handle {
             Some(handle) => Some(Win {
                 handle: handle,
                 mouse: Enigo::new(),
+                padding: padding,
             }),
             None => None,
         }
     }
 
     pub fn get_rect(&self) -> Rect {
-        Rect::new(self.handle)
+        let rect = Rect::new(self.handle);
+        Rect {
+            width_u32: rect.width_u32 - (self.padding.right + self.padding.left),
+            height_u32: rect.height_u32 - (self.padding.bottom + self.padding.top),
+            top_u32: rect.top_u32 + self.padding.top,
+            left_u32: rect.left_u32  + self.padding.left,
+            width_i32: rect.width_i32 - (self.padding.right + self.padding.left) as i32,
+            height_i32: rect.height_i32 - (self.padding.bottom + self.padding.top) as i32,
+            top_i32: rect.top_i32 + self.padding.top as i32,
+            left_i32: rect.left_i32 + self.padding.left as i32,
+        }
     }
 
     pub fn until_check_rgb(&self, x: u32, y: u32, rgb: [u8; 3], desc: &str) {
@@ -122,7 +141,8 @@ impl Win {
     }
 
     pub fn mouse_move(&mut self, x: i32, y: i32) {
-        self.mouse.mouse_move_to(x, y);
+        let rect = self.get_rect();
+        self.mouse.mouse_move_to(rect.left_i32 + x, rect.top_i32 + y);
         sleep(100);
     }
 
