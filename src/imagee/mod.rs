@@ -1,3 +1,4 @@
+use crate::win::Rect;
 use image::{ImageBuffer, Rgb};
 use std::mem::size_of;
 use std::ptr::null_mut;
@@ -7,8 +8,6 @@ use winapi::um::wingdi::{
     SelectObject, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, SRCCOPY,
 };
 use winapi::um::winuser::{GetDC, ReleaseDC};
-
-use crate::rect::Rect;
 
 pub struct Image {
     bitmap: Vec<u8>,
@@ -95,18 +94,38 @@ impl Image {
         }
     }
 
-    pub fn get_rgb_from_bitmap(&self, x: u32, y: u32) -> [u8; 3] {
-        let y = self.rect.height_u32 - y - 1;
-        let b = self.bitmap[((y * self.rect.width_u32 + x) * 4 + 0) as usize];
-        let g = self.bitmap[((y * self.rect.width_u32 + x) * 4 + 1) as usize];
-        let r = self.bitmap[((y * self.rect.width_u32 + x) * 4 + 2) as usize];
-        [r, g, b]
+    pub fn get_rgb_from_bitmap(&self, x: u32, y: u32) -> Option<[u8; 3]> {
+        let len = self.bitmap.len();
+        let y = self.rect.height_i32 - y as i32 - 1;
+
+        if y < 0 {
+            return None;
+        }
+
+        let b_index = (((y as u32) * self.rect.width_u32 + x) * 4 + 0) as usize;
+        let g_index = (((y as u32) * self.rect.width_u32 + x) * 4 + 1) as usize;
+        let r_index = (((y as u32) * self.rect.width_u32 + x) * 4 + 2) as usize;
+
+        if b_index > len || g_index > len || r_index > len {
+            return None;
+        }
+
+        let b = self.bitmap[b_index];
+        let g = self.bitmap[g_index];
+        let r = self.bitmap[r_index];
+        Some([r, g, b])
     }
 
     pub fn save(&self, path: &str) {
-        let img = ImageBuffer::from_fn(self.rect.width_u32, self.rect.height_u32, move |x, y| {
-            Rgb(self.get_rgb_from_bitmap(x, y))
-        });
+        let img =
+            ImageBuffer::from_fn(
+                self.rect.width_u32,
+                self.rect.height_u32,
+                move |x, y| match self.get_rgb_from_bitmap(x, y) {
+                    Some(v) => Rgb(v),
+                    None => Rgb([0, 0, 0]),
+                },
+            );
 
         match img.save(path) {
             Ok(_) => (),
