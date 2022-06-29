@@ -1,27 +1,37 @@
 mod imagee;
+mod rect;
 mod utils;
 mod win;
 
-use crate::imagee::Image;
-use crate::utils::create_dir;
-use crate::win::Win;
+use utils::create_dir;
+use win::CheckRGB;
+use win::Win;
 
 fn main() {
-    match Win::new("Foxmail") {
+    match Win::new("*无标题 - 记事本") {
         Some(mut win) => {
+            create_dir("assets");
+
             win.show_win();
 
-            let img = Image::new(win.get_rect());
+            win.image_save("assets/1.png");
 
-            println!("{:?}", img.get_rgb_from_bitmap(100, 100));
+            win.until_check_same_rgb(vec![
+                CheckRGB {
+                    x: 100,
+                    y: 100,
+                    rgb: [30, 30, 30],
+                    desc: "test",
+                },
+                CheckRGB {
+                    x: 101,
+                    y: 101,
+                    rgb: [30, 30, 30],
+                    desc: "test2",
+                },
+            ]);
 
-            create_dir("ok");
-
-            img.save("ok/d.png");
-
-            let r = win.get_rect();
-            win.mouse_move(r.left_i32 + r.width_i32 - 20, r.top_i32 + 200);
-            win.mouse_scroll_y(-10);
+            win.key_click('a');
         }
         None => (),
     }

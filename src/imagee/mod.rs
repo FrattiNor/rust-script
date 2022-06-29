@@ -1,4 +1,4 @@
-use crate::win::Rect;
+use crate::rect::Rect;
 use image::{ImageBuffer, Rgb};
 use std::mem::size_of;
 use std::ptr::null_mut;
@@ -9,14 +9,14 @@ use winapi::um::wingdi::{
 };
 use winapi::um::winuser::{GetDC, ReleaseDC};
 
-pub struct Image {
+pub struct Image<'a> {
     bitmap: Vec<u8>,
-    rect: Rect,
+    rect: &'a Rect,
 }
 
-impl Image {
+impl<'a> Image<'a> {
     #[cfg(windows)]
-    pub fn new(r: Rect) -> Self {
+    pub fn new(r: &'a Rect) -> Self {
         unsafe {
             let dc_window = GetDC(null_mut());
 

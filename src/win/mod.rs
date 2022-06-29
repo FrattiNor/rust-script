@@ -1,65 +1,21 @@
+use crate::rect::Rect;
 use crate::utils::{encode_wide, sleep};
-use enigo::Enigo;
-use enigo::{MouseButton, MouseControllable};
+use enigo::{Enigo, KeyboardControllable};
+use enigo::{Key, MouseButton, MouseControllable};
 use std::ptr::null_mut;
 use winapi::shared::windef::HWND__;
-use winapi::shared::windef::{POINT, RECT};
-use winapi::um::winuser::{ClientToScreen, GetClientRect};
 use winapi::um::winuser::{FindWindowW, SetForegroundWindow, ShowWindow, SW_RESTORE};
-
-#[derive(Debug)]
-pub struct Rect {
-    pub width_u32: u32,
-    pub height_u32: u32,
-    pub top_u32: u32,
-    pub left_u32: u32,
-    pub width_i32: i32,
-    pub height_i32: i32,
-    pub top_i32: i32,
-    pub left_i32: i32,
-}
-
-impl Rect {
-    #[cfg(windows)]
-    pub fn new(window: *mut HWND__) -> Self {
-        unsafe {
-            let mut rect = RECT {
-                left: 0,
-                top: 0,
-                right: 0,
-                bottom: 0,
-            };
-
-            GetClientRect(window, &mut rect);
-
-            let mut point = POINT { x: 0, y: 0 };
-
-            ClientToScreen(window, &mut point);
-
-            let width: i32 = rect.right;
-            let height: i32 = rect.bottom;
-            let left: i32 = point.x;
-            let top: i32 = point.y;
-
-            let res = Rect {
-                width_u32: width as u32,
-                height_u32: height as u32,
-                top_u32: top as u32,
-                left_u32: left as u32,
-                width_i32: width,
-                height_i32: height,
-                top_i32: top,
-                left_i32: left,
-            };
-
-            res
-        }
-    }
-}
 
 pub struct Win {
     handle: *mut HWND__,
     pub mouse: Enigo,
+}
+
+pub struct CheckRGB {
+    pub x: u32,
+    pub y: u32,
+    pub rgb: [u8; 3],
+    pub desc: &'static str,
 }
 
 impl Win {
@@ -107,6 +63,64 @@ impl Win {
         Rect::new(self.handle)
     }
 
+    pub fn until_check_rgb(&self, x: u32, y: u32, rgb: [u8; 3], desc: &str) {
+        match self.get_rect().get_image().get_rgb_from_bitmap(x, y) {
+            Some(image_rgb) => {
+                if image_rgb[0] == rgb[0] && image_rgb[1] == rgb[1] && image_rgb[2] == rgb[2] {
+                    return ();
+                } else {
+                    println!(
+                        "{},{}坐标,{}的RGB为{:?}和{:?}不匹配，等待一秒后再对比",
+                        x, y, desc, image_rgb, rgb
+                    );
+                    sleep(1000);
+                    self.until_check_rgb(x, y, rgb, desc);
+                }
+            }
+            None => {
+                println!("获取不到{}, 等待一秒后再对比", desc);
+                sleep(1000);
+                self.until_check_rgb(x, y, rgb, desc);
+            }
+        }
+    }
+
+    pub fn until_check_same_rgb(&self, list: Vec<CheckRGB>) {
+        let rect = self.get_rect();
+        let img = rect.get_image();
+        let mut same = true;
+
+        for item in list.iter() {
+            match img.get_rgb_from_bitmap(item.x, item.y) {
+                Some(image_rgb) => {
+                    if image_rgb[0] != item.rgb[0]
+                        || image_rgb[1] != item.rgb[1]
+                        || image_rgb[2] != item.rgb[2]
+                    {
+                        println!(
+                            "{},{}坐标,{}的RGB为{:?}和{:?}不匹配，等待一秒后再对比",
+                            item.x, item.y, item.desc, image_rgb, item.rgb
+                        );
+                        same = false;
+                    }
+                }
+                None => {
+                    println!("获取不到{}, 等待一秒后再对比", item.desc);
+                    same = false;
+                }
+            }
+        }
+
+        if !same {
+            sleep(1000);
+            self.until_check_same_rgb(list);
+        }
+    }
+
+    pub fn image_save(&self, path: &str) {
+        self.get_rect().get_image().save(path);
+    }
+
     pub fn mouse_move(&mut self, x: i32, y: i32) {
         self.mouse.mouse_move_to(x, y);
         sleep(100);
@@ -150,5 +164,9 @@ impl Win {
     pub fn mouse_scroll_y(&mut self, number: i32) {
         self.mouse.mouse_scroll_y(number);
         sleep(100);
+    }
+
+    pub fn key_click(&mut self, c: char) {
+        self.mouse.key_click(Key::Layout(c));
     }
 }
